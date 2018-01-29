@@ -9,13 +9,3 @@ Table of Contents
    dockerintro
 
    dockeradvanced
-
-   singularityintro
-
-   singularityadvanced
-
-   containerscaling
-
-   biocontainers
-
-   instructors
