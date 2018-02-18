@@ -5,7 +5,8 @@ Table of Contents
    :maxdepth: 1
    :caption: CyVerse Docker workshop
 
-   getting_started/main
+   main
+
    getting_started/installation
    getting_started/about_cyverse
 
