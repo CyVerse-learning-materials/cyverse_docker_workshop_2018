@@ -2,7 +2,7 @@
 ======================
 
 These are the minimum Setup Instructions for the Docker workshop at CyVerse, 
-University of Arizona, which will run on March 1st 2018.
+University of Arizona, which will run on April 26th 2018.
 
 
 .. list-table::
@@ -18,6 +18,11 @@ University of Arizona, which will run on March 1st 2018.
         permissions on your laptop.
       - - `Download FireFox <https://www.mozilla.org/en-US/firefox/new/?scene=2>`_
         - `Download Chrome <https://www.google.com/chrome/browser/>`_
+    * - Docker
+      - Install Docker on your computer
+      - - `Docker for mac <https://docs.docker.com/docker-for-mac/install/>`_
+        - `Docker for windows <https://docs.docker.com/docker-for-windows/install/>`_
+        - `Docker for Linux <https://docs.docker.com/install/linux/docker-ce/ubuntu/>`_
     * - Github Account
       - Please ensure that you have a Github account if you don't have one already
       - Register for your Github account at `https://github.com/ <https://github.com/>`_.
