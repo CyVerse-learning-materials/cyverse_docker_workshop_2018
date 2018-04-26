@@ -3,10 +3,110 @@
 
 Now that we are relatively comfortable with Docker basics, lets look at some of the advanced Docker topics such as porting the Docker image to repositories (public and private), managing data in containers and finally deploy containers into cloud and other infrastructures etc.,
 
-1. Docker registries
+1. Managing data in Docker
+==========================
+
+It is possible to store data within the writable layer of a container, but there are some limitations:
+
+- The data doesn’t persist when that container is no longer running, and it can be difficult to get the data out of the container if another process needs it.
+
+- A container’s writable layer is tightly coupled to the host machine where the container is running. You can’t easily move the data somewhere else.
+
+Docker offers three different ways to mount data into a container from the Docker host: **volumes**, **bind mounts**, or **tmpfs volumes**. When in doubt, volumes are almost always the right choice.
+
+1.1 Volumes 
+~~~~~~~~~~~
+
+**Volumes** are created and managed by Docker. You can create a volume explicitly using the ``docker volume create`` command, or Docker can create a volume during container creation. When you create a volume, it is stored within a directory on the Docker host (``/var/lib/docker/`` on Linux and check for the location on mac in here https://timonweb.com/posts/getting-path-and-accessing-persistent-volumes-in-docker-for-mac/). When you mount the volume into a container, this directory is what is mounted into the container. A given volume can be mounted into multiple containers simultaneously. When no running container is using a volume, the volume is still available to Docker and is not removed automatically. You can remove unused volumes using ``docker volume prune`` command. 
+
+|volumes|
+
+Volumes are often a better choice than persisting data in a container’s writable layer, because using a volume does not increase the size of containers using it, and the volume’s contents exist outside the lifecycle of a given container. While bind mounts (which we will see later) are dependent on the directory structure of the host machine, volumes are completely managed by Docker. Volumes have several advantages over bind mounts:
+
+- Volumes are easier to back up or migrate than bind mounts.
+- You can manage volumes using Docker CLI commands or the Docker API.
+- Volumes work on both Linux and Windows containers.
+- Volumes can be more safely shared among multiple containers.
+- A new volume’s contents can be pre-populated by a container.
+
+.. Note::
+
+	If your container generates non-persistent state data, consider using a ``tmpfs`` mount to avoid storing the data anywhere permanently, and to increase the container’s performance by avoiding writing into the container’s writable layer.
+
+	Originally, the ``-v`` or ``--volume`` flag was used for standalone containers and the ``--mount`` flag was used for swarm services. However, starting with Docker 17.06, you can also use ``--mount`` with standalone containers. In general, ``--mount`` is more explicit and verbose. The biggest difference is that the ``-v`` syntax combines all the options together in one field, while the ``--mount`` syntax separates them. Here is a comparison of the syntax for each flag.
+
+ 	New users should use the ``--mount`` syntax. Experienced users may be more familiar with the ``-v`` or ``--volume`` syntax, but are encouraged to use ``--mount``, because research has shown it to be easier to use.
+
+``-v`` or ``--volume``: Consists of three fields, separated by colon characters (:). The fields must be in the correct order, and the meaning of each field is not immediately obvious.
+- In the case of named volumes, the first field is the name of the volume, and is unique on a given host machine.
+- The second field is the path where the file or directory are mounted in the container.
+- The third field is optional, and is a comma-separated list of options, such as ``ro``.
+
+``--mount``: Consists of multiple key-value pairs, separated by commas and each consisting of a ``<key>=<value>`` tuple. The ``--mount`` syntax is more verbose than ``-v`` or ``--volume``, but the order of the keys is not significant, and the value of the flag is easier to understand.
+- The type of the mount, which can be **bind**, **volume**, or **tmpfs**.
+- The source of the mount. For named volumes, this is the name of the volume. For anonymous volumes, this field is omitted. May be specified as **source** or **src**.
+- The destination takes as its value the path where the file or directory is mounted in the container. May be specified as **destination**, **dst**, or **target**.
+- The readonly option, if present, causes the bind mount to be mounted into the container as read-only.
+
+.. Note::
+
+	The ``--mount`` and ``-v`` examples have the same end result.
+
+1.1.1 Bind mounts
+~~~~~~~~~~~~~~~~~
+
+**Bind mounts:** When you use a bind mount, a file or directory on the host machine is mounted into a container. 
+
+.. tip::
+
+	If you are developing new Docker applications, consider using named **volumes** instead. You can’t use Docker CLI commands to directly manage bind mounts.
+
+|bind_mount|
+
+.. Warning:: 
+
+	One side effect of using bind mounts, for better or for worse, is that you can change the host filesystem via processes running in a container, including creating, modifying, or deleting important system files or directories. This is a powerful ability which can have security implications, including impacting non-Docker processes on the host system.
+
+	If you use ``--mount`` to bind-mount a file or directory that does not yet exist on the Docker host, Docker does not automatically create it for you, but generates an error.
+
+1.1.2 Start a container with a bind mount
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+	.. code-block :: bash
+
+		$ docker run --rm --name "devtest" -v ${PWD}:/data -w /data gcc/diamond:1.0 makedb --in test.fa -d nr
+
+Use `docker inspect devtest` to verify that the bind mount was created correctly. Look for the "Mounts" section
+
+.. code-block::
+
+	$ docker inspect devtest
+
+	"Mounts": [
+	            {
+	                "Type": "bind",
+	                "Source": "/Users/upendra_35/Downloads/docker_workshop/data",
+	                "Destination": "/data",
+	                "Mode": "",
+	                "RW": true,
+	                "Propagation": "rprivate"
+	            }
+	        ],
+
+This shows that the mount is a bind mount, it shows the correct source and target, it shows that the mount is read-write, and that the propagation is set to rprivate.
+
+Stop the container:
+
+.. code-block:: bash
+
+	$ docker rm -f devtest
+
+2. Docker registries
 ====================
 
-To demonstrate the portability of what we just created, let’s upload our built Docker image and run it somewhere else (Atmosphere cloud). After all, you’ll need to learn how to push to registries when you want to deploy containers to production.
+To demonstrate the portability of what we just created, let’s upload our built Docker image and run it somewhere else (Play with Docker <>). After all, you’ll need to learn how to push to registries when you want to deploy containers to production.
 
 .. important::
 
@@ -21,12 +121,12 @@ There are several things you can do with Docker registries:
 - Pulling images
 - Sharing images
 
-1.1 Public repositories 
+2.1 Public repositories 
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Some example of public registries include `Docker cloud <https://cloud.docker.com/>`_, `Docker hub <https://hub.docker.com/>`_ and `quay.io <https://quay.io/>`_.
 
-1.1.1 Log in with your Docker ID
+2.1.1 Log in with your Docker ID
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Now that you've created and tested your image, you can push it to Docker cloud or Docker hub.
@@ -46,7 +146,7 @@ First you have to login to your Docker hub account. To do that:
 
 Enter Username and Password when prompted.
 
-1.1.2 Tag the image
+2.1.2 Tag the image
 ^^^^^^^^^^^^^^^^^^^
 
 The notation for associating a local image with a repository on a registry is ``username/repository:tag``. The tag is optional, but recommended, since it is the mechanism that registries use to give Docker images a version. Give the repository and tag meaningful names for the context, such as ``get-started:part2``. This will put the image in the ``get-started`` repository and tag it as ``part2``.
@@ -61,7 +161,7 @@ Now, put it all together to tag the image. Run docker tag image with your userna
 
 	$ docker tag $YOUR_DOCKERHUB_USERNAME/myfirstapp $YOUR_DOCKERHUB_USERNAME/myfirstapp:1.0
 
-1.1.3 Publish the image
+2.1.3 Publish the image
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 Upload your tagged image to the Dockerhub repository
@@ -76,7 +176,7 @@ Once complete, the results of this upload are publicly available. If you log in 
 
 Congrats! You just made your first Docker image and shared it with the world!
 
-1.1.4 Pull and run the image from the remote repository
+2.1.4 Pull and run the image from the remote repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Let's try to run the image from the remote repository on Cloud server by logging into CyVerse Atmosphere, `launching an instance <../atmosphere/boot.html>`_
@@ -99,12 +199,12 @@ Now run the following command to run the docker image from Dockerhub
 
 Head over to ``http://<ipaddress>:8888`` and your app should be live. 
 
-1.2 Private repositories
+2.2 Private repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 In an earlier part, we had looked at the Docker Hub, which is a public registry that is hosted by Docker. While the Dockerhub plays an important role in giving public visibility to your Docker images and for you to utilize quality Docker images put up by others, there is a clear need to setup your own private registry too for your team/organization. For example, CyVerse has it own private registry which will be used to push the Docker images.
 
-1.2.1 Pull down the Registry Image
+2.2.1 Pull down the Registry Image
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You might have guessed by now that the registry must be available as a Docker image from the Docker Hub and it should be as simple as pulling the image down and running that. You are correct!
@@ -127,7 +227,7 @@ Run ``docker ps -l`` to check the recent container from this Docker image
 	CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
 	6e44a0459373        registry:2          "/entrypoint.sh /e..."   11 seconds ago      Up 10 seconds       0.0.0.0:5000->5000/tcp   registry
 
-1.2.2 Tag the image that you want to push
+2.2.2 Tag the image that you want to push
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Next step is to tag your image under the registry namespace and push it there
@@ -138,7 +238,7 @@ Next step is to tag your image under the registry namespace and push it there
 
 	$ docker tag $YOUR_DOCKERHUB_USERNAME/myfirstapp:1.0 $REGISTRY/$(whoami)/myfirstapp:1.0
 
-1.2.2 Publish the image into the local registry
+2.2.3 Publish the image into the local registry
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Finally push the image to the local registry
@@ -155,7 +255,7 @@ Finally push the image to the local registry
 	60ab55d3379d: Pushed 
 	1.0: digest: sha256:5095dea8b2cf308c5866ef646a0e84d494a00ff0e9b2c8e8313a176424a230ce size: 1572
 
-1.2.3 Pull and run the image from the local repository
+2.2.4 Pull and run the image from the local repository
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can also pull the image from the local repository similar to how you pull it from Dockerhub and run a container from it
@@ -164,7 +264,7 @@ You can also pull the image from the local repository similar to how you pull it
 
 	$ docker run -d -P --name=myfirstapplocal $REGISTRY/$(whoami)/myfirstapp:1.0
 
-2. Automated Docker image building from github
+3. Automated Docker image building from github
 ==============================================
 
 An automated build is a Docker image build that is triggered by a code change in a GitHub or Bitbucket repository. By linking a remote code repository to a Dockerhub automated build repository, you can build a new Docker image every time a code change is pushed to your code repository.
@@ -178,7 +278,7 @@ Automated Builds have several advantages:
 - Your repository is kept up-to-date with code changes automatically.
 - Automated Builds are supported for both public and private repositories on both GitHub and Bitbucket.
 
-2.1 Prerequisites
+3.1 Prerequisites
 ~~~~~~~~~~~~~~~~~
 
 To use automated builds, you first must have an account on `Docker Hub <https://hub.docker.com>`_ and on the hosted repository provider (`GitHub <https://github.com/>`_ or `Bitbucket <https://bitbucket.org/>`_). While Dockerhub supports linking both GitHub and Bitbucket repositories, here we will use a GitHub repository. If you don't already have one, make sure you have a GitHub account. A basic account is free
@@ -189,7 +289,7 @@ To use automated builds, you first must have an account on `Docker Hub <https://
 
 	- Building Windows containers is not supported.
 
-2.2 Link your Docker Hub account to GitHub
+3.2 Link your Docker Hub account to GitHub
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1.	Log into Docker Hub.
@@ -206,7 +306,7 @@ After you grant access to your code repository, the system returns you to Docker
 
 |auto_build-1|
 
-2.3 Create a new automated build
+3.3 Create a new automated build
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Automated build repositories rely on the integration with your github code repository to build. 
@@ -345,308 +445,6 @@ Exercise 1 (5-10 mins): Updating and automated building
 - Trigger automatic build with a new tag (2.0) on Dockerhub
 - Run an instance to make sure the new pics show up
 - Share your Dockerhub link url on Slack
-
-3. Managing data in Docker
-==========================
-
-It is possible to store data within the writable layer of a container, but there are some limitations:
-
-- The data doesn’t persist when that container is no longer running, and it can be difficult to get the data out of the container if another process needs it.
-
-- A container’s writable layer is tightly coupled to the host machine where the container is running. You can’t easily move the data somewhere else.
-
-Docker offers three different ways to mount data into a container from the Docker host: **volumes**, **bind mounts**, or **tmpfs volumes**. When in doubt, volumes are almost always the right choice.
-
-3.1 Volumes 
-~~~~~~~~~~~
-
-**Volumes** are created and managed by Docker. You can create a volume explicitly using the ``docker volume create`` command, or Docker can create a volume during container creation. When you create a volume, it is stored within a directory on the Docker host (``/var/lib/docker/`` on Linux and check for the location on mac in here https://timonweb.com/posts/getting-path-and-accessing-persistent-volumes-in-docker-for-mac/). When you mount the volume into a container, this directory is what is mounted into the container. A given volume can be mounted into multiple containers simultaneously. When no running container is using a volume, the volume is still available to Docker and is not removed automatically. You can remove unused volumes using ``docker volume prune`` command. 
-
-|volumes|
-
-Volumes are often a better choice than persisting data in a container’s writable layer, because using a volume does not increase the size of containers using it, and the volume’s contents exist outside the lifecycle of a given container. While bind mounts (which we will see later) are dependent on the directory structure of the host machine, volumes are completely managed by Docker. Volumes have several advantages over bind mounts:
-
-- Volumes are easier to back up or migrate than bind mounts.
-- You can manage volumes using Docker CLI commands or the Docker API.
-- Volumes work on both Linux and Windows containers.
-- Volumes can be more safely shared among multiple containers.
-- A new volume’s contents can be pre-populated by a container.
-
-.. Note::
-
-	If your container generates non-persistent state data, consider using a ``tmpfs`` mount to avoid storing the data anywhere permanently, and to increase the container’s performance by avoiding writing into the container’s writable layer.
-
-3.1.1 Choose the -v or –mount flag for mounting volumes
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Originally, the ``-v`` or ``--volume`` flag was used for standalone containers and the ``--mount`` flag was used for swarm services. However, starting with Docker 17.06, you can also use ``--mount`` with standalone containers. In general, ``--mount`` is more explicit and verbose. The biggest difference is that the ``-v`` syntax combines all the options together in one field, while the ``--mount`` syntax separates them. Here is a comparison of the syntax for each flag.
-
-.. Tip::
-
- 	New users should use the ``--mount`` syntax. Experienced users may be more familiar with the ``-v`` or ``--volume`` syntax, but are encouraged to use ``--mount``, because research has shown it to be easier to use.
-
-``-v`` or ``--volume``: Consists of three fields, separated by colon characters (:). The fields must be in the correct order, and the meaning of each field is not immediately obvious.
-- In the case of named volumes, the first field is the name of the volume, and is unique on a given host machine.
-- The second field is the path where the file or directory are mounted in the container.
-- The third field is optional, and is a comma-separated list of options, such as ``ro``.
-
-``--mount``: Consists of multiple key-value pairs, separated by commas and each consisting of a ``<key>=<value>`` tuple. The ``--mount`` syntax is more verbose than ``-v`` or ``--volume``, but the order of the keys is not significant, and the value of the flag is easier to understand.
-- The type of the mount, which can be **bind**, **volume**, or **tmpfs**.
-- The source of the mount. For named volumes, this is the name of the volume. For anonymous volumes, this field is omitted. May be specified as **source** or **src**.
-- The destination takes as its value the path where the file or directory is mounted in the container. May be specified as **destination**, **dst**, or **target**.
-- The readonly option, if present, causes the bind mount to be mounted into the container as read-only.
-
-.. Note::
-
-	The ``--mount`` and ``-v`` examples have the same end result.
-
-3.1.2. Create and manage volumes
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Unlike a bind mount, you can create and manage volumes outside the scope of any container.
-
-Let's create a volume
-
-.. code-block:: bash
-
-	$ docker volume create my-vol
-
-List volumes:
-
-.. code-block:: bash
-
-	$ docker volume ls
-
-	local               my-vol
-
-Inspect a volume by looking at the Mount section in the `docker volume inspect`
-
-.. code-block:: bash
-
-	$ docker volume inspect my-vol
-	[
-	    {
-	        "Driver": "local",
-	        "Labels": {},
-	        "Mountpoint": "/var/lib/docker/volumes/my-vol/_data",
-	        "Name": "my-vol",
-	        "Options": {},
-	        "Scope": "local"
-	    }
-	]
-
-Remove a volume
-
-.. code-block:: bash
-
-	$ docker volume rm my-vol
-
-3.1.3 Populate a volume using a container
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This example starts an ``nginx`` container and populates the new volume ``nginx-vol`` with the contents of the container’s ``/var/log/nginx`` directory, which is where Nginx stores its log files.
-
-.. code-block:: bash
-
-	$ docker run -d -p 8891:80 --name=nginxtest --mount source=nginx-vol,target=/var/log/nginx nginx:latest
-
-So, we now have a copy of Nginx running inside a Docker container on our machine, and our host machine's port 5000 maps directly to that copy of Nginx's port 80. Let's use curl to do a quick test request:
-
-.. code-block:: bash
-
-	$ curl localhost:8891
-	<!DOCTYPE html>
-	<html>
-	<head>
-	<title>Welcome to nginx!</title>
-	<style>
-	    body {
-	        width: 35em;
-	        margin: 0 auto;
-	        font-family: Tahoma, Verdana, Arial, sans-serif;
-	    }
-	</style>
-	</head>
-	<body>
-	<h1>Welcome to nginx!</h1>
-	<p>If you see this page, the nginx web server is successfully installed and
-	working. Further configuration is required.</p>
-
-	<p>For online documentation and support please refer to
-	<a href="http://nginx.org/">nginx.org</a>.<br/>
-	Commercial support is available at
-	<a href="http://nginx.com/">nginx.com</a>.</p>
-
-	<p><em>Thank you for using nginx.</em></p>
-	</body>
-	</html>
-
-You'll get a screenful of HTML back from Nginx showing that Nginx is up and running. But more interestingly, if you look in the ``nginx-vol`` volume on the host machine and take a look at the ``access.log`` file you'll see a log message from Nginx showing our request.
-
-.. code-block:: bash
-	
-	cat nginx-vol/_data/access.log
-
-Use ``docker inspect nginx-vol`` to verify that the volume was created and mounted correctly. Look for the Mounts section:
-
-.. code-block:: bash
-
-	"Mounts": [
-	            {
-	                "Type": "volume",
-	                "Name": "nginx-vol",
-	                "Source": "/var/lib/docker/volumes/nginx-vol/_data",
-	                "Destination": "/var/log/nginx",
-	                "Driver": "local",
-	                "Mode": "z",
-	                "RW": true,
-	                "Propagation": ""
-	            }
-	        ],
-
-This shows that the mount is a volume, it shows the correct source and destination, and that the mount is read-write.
-
-After running either of these examples, run the following commands to clean up the containers and volumes.
-
-.. code-block:: bash
-
-	$ docker stop nginxtest
-
-	$ docker rm nginxtest
-
-	$ docker volume rm nginx-vol
-
-3.2 Bind mounts
-~~~~~~~~~~~~~~~
-
-**Bind mounts:** When you use a bind mount, a file or directory on the host machine is mounted into a container. 
-
-.. tip::
-
-	If you are developing new Docker applications, consider using named **volumes** instead. You can’t use Docker CLI commands to directly manage bind mounts.
-
-|bind_mount|
-
-.. Warning:: 
-
-	One side effect of using bind mounts, for better or for worse, is that you can change the host filesystem via processes running in a container, including creating, modifying, or deleting important system files or directories. This is a powerful ability which can have security implications, including impacting non-Docker processes on the host system.
-
-	If you use ``--mount`` to bind-mount a file or directory that does not yet exist on the Docker host, Docker does not automatically create it for you, but generates an error.
-
-3.2.1 Start a container with a bind mount
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-	$ mkdir data
-
-	$ docker run -d -p 8891:80 --name devtest --mount type=bind,source="$(pwd)"/data,target=/var/log/nginx nginx:latest
-
-Use `docker inspect devtest` to verify that the bind mount was created correctly. Look for the "Mounts" section
-
-.. code-block::
-
-	$ docker inspect devtest
-
-	"Mounts": [
-	            {
-	                "Type": "bind",
-	                "Source": "/Users/upendra_35/Documents/git.repos/flask-app/data",
-	                "Destination": "/var/log/nginx",
-	                "Mode": "",
-	                "RW": true,
-	                "Propagation": "rprivate"
-	            }
-	        ],
-
-This shows that the mount is a bind mount, it shows the correct source and target, it shows that the mount is read-write, and that the propagation is set to rprivate.
-
-Stop the container:
-
-.. code-block:: bash
-
-	$ docker rm -f devtest
-
-3.2.2 Use a read-only bind mount
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-For some development applications, the container needs to write into the bind mount, so changes are propagated back to the Docker host. At other times, the container only needs read access.
-
-This example modifies the one above but mounts the directory as a read-only bind mount, by adding ``ro`` to the (empty by default) list of options, after the mount point within the container. Where multiple options are present, separate them by commas.
-
-.. code-block:: bash
-
-	$ docker run -d -p 8891:80 --name devtest --mount type=bind,source="$(pwd)"/data,target=/var/log/nginx,readonly nginx:latest
-
-Use ``docker inspect devtest`` to verify that the bind mount was created correctly. Look for the Mounts section:
-
-.. code-block:: bash
-
-	"Mounts": [
-            {
-                "Type": "bind",
-                "Source": "/Users/upendra_35/Documents/git.repos/flask-app/data",
-                "Destination": "/var/log/nginx",
-                "Mode": "",
-                "RW": false,
-                "Propagation": "rprivate"
-            }
-        ],
-Stop the container:
-
-.. code-block:: bash
-
-	$ docker rm -f devtest
-
-Remove the volume:
-
-.. code-block:: bash
-
-	$ docker volume rm devtest
-
-3.3 tmpfs
-~~~~~~~~~
-
-**tmpfs mounts:** A tmpfs mount is not persisted on disk, either on the Docker host or within a container. It can be used by a container during the lifetime of the container, to store non-persistent state or sensitive information. For instance, internally, swarm services use tmpfs mounts to mount secrets into a service’s containers.
-
-|tmpfs|
-
-**Volumes** and **bind mounts** are mounted into the container’s filesystem by default, and their contents are stored on the host machine. There may be cases where you do not want to store a container’s data on the host machine, but you also don’t want to write the data into the container’s writable layer, for performance or security reasons, or if the data relates to non-persistent application state. An example might be a temporary one-time password that the container’s application creates and uses as-needed. To give the container access to the data without writing it anywhere permanently, you can use a tmpfs mount, which is only stored in the host machine’s memory (or swap, if memory is low). When the container stops, the tmpfs mount is removed. If a container is committed, the tmpfs mount is not saved.
-
-.. code-block:: bash
-
-	$ docker run -d -p 8891:80 --name devtest --mount type=tmpfs,target=/var/log/nginx nginx:latest
-
-Use `docker inspect devtest` to verify that the bind mount was created correctly. Look for the Mounts section:
-
-.. code-block:: bash
-
-	$ docker inspect devtest
-
-	"Mounts": [
-	            {
-	                "Type": "tmpfs",
-	                "Source": "",
-	                "Destination": "/var/log/nginx",
-	                "Mode": "",
-	                "RW": true,
-	                "Propagation": ""
-	            }
-	        ],
-
-You can see from the above output that the ``Source`` filed is empty which indicates that the contents are not avaible on Docker host or host file system. 
-
-Stop the container:
-
-.. code-block:: bash
-
-	$ docker rm -f devtest
-
-Remove the volume:
-
-.. code-block:: bash
-
-	$ docker volume rm devtest
 
 4. Docker Compose for multi container apps
 ==========================================
@@ -810,7 +608,7 @@ A brief explanation of ``docker-compose.yml`` is as below:
 
 And that’s it! You should be able to see the Flask application running on ``http://localhost:8888`` or ``<ipaddress>:8888``
 
-|docker-compose|
+|dc-1|
 
 Exercise 2 (10 mins)
 ~~~~~~~~~~~~~~~~~~~~
@@ -877,7 +675,7 @@ Docker allows us to run a ‘ready to go’ Jupyter data science stack in what�
 	      - .:/data
 	    ports:
 	      - 8888:8888
-	    container_name:   datascience-notebook-container
+	    container_name: datascience-notebook-container
 
 .. Note::
 
