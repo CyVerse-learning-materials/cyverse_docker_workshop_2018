@@ -1,5 +1,5 @@
-Docker related resources
-------------------------
+**Docker related resources**
+============================
 
 `Awesome Docker <https://veggiemonk.github.io/awesome-docker/>`_
 
