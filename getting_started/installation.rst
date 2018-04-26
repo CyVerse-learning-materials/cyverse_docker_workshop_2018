@@ -28,7 +28,7 @@ University of Arizona, which will run on April 26th 2018.
       - Register for your Github account at `https://github.com/ <https://github.com/>`_.
     * - Dockerhub Account
       - Please ensure that you have a Dockerhub account if you don't have one already
-      - Register for your Dockerhub account at `https://dockerhub.com/ <https://dockerhub.com/>`_.
+      - Register for your Dockerhub account at `https://dockerhub.com/ <https://hub.docker.com/>`_.
     * - Text Editor
       - Please ensure that you have a Text editor of your choice. Any decent text editor would be sufficient and
         recommended ones include Sublime2 and Atom
